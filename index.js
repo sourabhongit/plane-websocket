@@ -1,26 +1,53 @@
 const WebSocket = require("ws");
-const PORT = 8080;
 
-const server = new WebSocket.Server({ port: PORT });
+const wss = new WebSocket.Server({ port: 4070 });
 
-console.log(`WebSocket server started on ws://localhost:${PORT}`);
+console.log("WebSocket server started on 4070");
 
-server.on("connection", (socket) => {
-	console.log("New client connected");
+let countdown = 30;
 
-	// Send a welcome message to the client
-	socket.send(JSON.stringify({ message: "Welcome to the WebSocket server!" }));
+const startCountdown = () => {
+	setInterval(() => {
+		if (countdown >= 0) {
+			// Broadcast the countdown to all connected clients
+			wss.clients.forEach((client) => {
+				if (client.readyState === WebSocket.OPEN) {
+					client.send(JSON.stringify({ countdown: countdown }));
+				}
+			});
+			countdown--;
+		} else {
+			// Reset countdown to 30 when it reaches -1
+			countdown = 30;
+		}
+	}, 1000);
+};
+
+// Start the countdown when the server starts
+startCountdown();
+
+wss.on("connection", (socket) => {
+	console.log("New client connected!");
+
+	// Send a welcome message and current countdown to the newly connected client
+	socket.send(JSON.stringify({ message: "oooho yess bhai!!!!!!", countdown: countdown }));
 
 	// Listen for messages from the client
 	socket.on("message", (data) => {
 		console.log("Received message:", data);
 
-		// Broadcast the received message to all connected clients
-		server.clients.forEach((client) => {
-			if (client.readyState === WebSocket.OPEN) {
-				client.send(data);
-			}
-		});
+		try {
+			const parsedData = JSON.parse(data);
+
+			// Broadcast the received message to all connected clients
+			wss.clients.forEach((client) => {
+				if (client.readyState === WebSocket.OPEN) {
+					client.send(JSON.stringify(parsedData));
+				}
+			});
+		} catch (err) {
+			console.error("Error parsing message:", err.message);
+		}
 	});
 
 	// Handle the client disconnecting
